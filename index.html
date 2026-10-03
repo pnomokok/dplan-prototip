@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>D-Plan · Tamamlanma kontrolü prototipi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F1F6; --surface:#FFFFFF; --ink:#1F1A2B; --muted:#6B6478; --line:#DCD7E3;
+  --pink:#D23F73; --pink-soft:#F8E1EA; --green:#2E8B57; --blue:#3E7FD9;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15111C; --surface:#1E1928; --ink:#EEEAF4; --muted:#A59DB3; --line:#342C42;
+    --pink:#EC5D90; --pink-soft:#3A1F2C; --green:#6FCF97; --blue:#6AA3F0;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15111C; --surface:#1E1928; --ink:#EEEAF4; --muted:#A59DB3; --line:#342C42;
+  --pink:#EC5D90; --pink-soft:#3A1F2C; --green:#6FCF97; --blue:#6AA3F0;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 48px}
+header.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.15;margin:0 0 6px;font-weight:700;letter-spacing:-0.02em}
+.lead{margin:0;color:var(--muted);max-width:60ch}
+.restart{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:8px 16px;font-size:14px}
+.restart:hover{border-color:var(--muted)}
+
+/* Week strip */
+.week{margin:28px 0 24px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 18px 14px}
+.week-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.week-head strong{font-size:15px}
+.week-head span{font-size:13px;color:var(--muted)}
+.track{position:relative;height:64px}
+.days{position:absolute;inset:0;display:flex}
+.day{flex:1;border-left:1px solid var(--line);padding:0 0 0 6px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:2px}
+.day:first-child{border-left:none}
+.day b{display:block;font-size:15px;color:var(--ink);font-weight:600}
+.rail{position:absolute;left:0;right:0;top:14px;height:4px;border-radius:2px;background:var(--line)}
+.fill{position:absolute;left:0;top:14px;height:4px;border-radius:2px;background:var(--pink);transition:width .5s ease}
+.mk{position:absolute;top:16px;transform:translate(-50%,-50%);border-radius:50%}
+.mk.now{width:16px;height:16px;background:var(--pink);border:3px solid var(--surface);box-shadow:0 0 0 1px var(--pink);transition:left .5s ease;z-index:3}
+.mk.ev{width:8px;height:8px;background:var(--muted);z-index:2}
+.mk.start{width:12px;height:12px;border:2px solid var(--blue);background:var(--surface);z-index:2}
+.deadline{position:absolute;top:2px;width:2px;height:28px;background:var(--ink);transform:translateX(-1px);z-index:2}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+
+/* Main grid */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:28px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}.phone-col{order:-1}}
+.story{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px}
+.chapter{font-size:13px;color:var(--pink);font-weight:600;margin:0 0 4px}
+.story h2{font-size:22px;line-height:1.25;margin:0 0 10px;font-weight:700;letter-spacing:-0.01em}
+.story p{margin:0 0 12px;max-width:62ch}
+.story .why{border-left:3px solid var(--pink);padding:2px 0 2px 12px;color:var(--muted);font-size:14px;margin-top:4px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.btn{border-radius:12px;padding:10px 16px;font-size:15px;border:1px solid var(--line);background:transparent;color:var(--ink)}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--pink);border-color:var(--pink);color:#fff}
+.btn.primary:hover{filter:brightness(1.06)}
+.hint{font-size:13px;color:var(--muted);margin-top:12px}
+
+.log{margin-top:20px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 20px}
+.log h3{font-size:15px;margin:0 0 2px}
+.log .sub{font-size:13px;color:var(--muted);margin:0 0 12px}
+.state{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.pill{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--pink-soft);color:var(--ink)}
+.log ol{list-style:none;margin:0;padding:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+.log li{padding:7px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px}
+.log li:first-child{border-top:none}
+.log li time{color:var(--muted)}
+.log li.new{animation:flash 1.2s ease}
+@keyframes flash{from{background:var(--pink-soft)}to{background:transparent}}
+
+.note{font-size:12.5px;color:var(--muted);margin-top:22px;max-width:70ch}
+
+/* Phone */
+.phone-col{position:sticky;top:20px}
+.phone{width:100%;max-width:330px;margin:0 auto;background:#0B0910;border-radius:46px;padding:11px;box-shadow:0 18px 40px rgba(20,10,30,.25)}
+.screen{position:relative;height:640px;border-radius:36px;overflow:hidden;color:#fff;
+  background:radial-gradient(120% 70% at 15% 10%,#3B2556 0%,transparent 60%),radial-gradient(90% 60% at 90% 80%,#4A1E3A 0%,transparent 65%),#1A1424}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:14px 26px 0;font-size:14px;font-weight:600;height:44px}
+.sb .ic{display:flex;gap:5px;align-items:center}
+.sb .bar{width:3px;background:#fff;border-radius:1px}
+.island{position:absolute;top:10px;left:50%;transform:translateX(-50%);height:30px;min-width:96px;background:#000;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 12px;font-size:12px;z-index:5;transition:min-width .3s ease}
+.island.live{min-width:180px;justify-content:space-between}
+.dot{width:8px;height:8px;border-radius:50%;background:#E0457B;display:inline-block}
+.scr{position:absolute;inset:44px 0 0 0;padding:10px 16px 18px;display:flex;flex-direction:column}
+.glass{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);border-radius:18px}
+.mu{color:rgba(255,255,255,.62);font-size:12px}
+.appic{width:28px;height:28px;border-radius:8px;background:#E0457B;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.appic svg{width:16px;height:16px}
+.lock-date{text-align:center;font-size:16px;color:rgba(255,255,255,.85);margin-top:10px}
+.lock-time{text-align:center;font-size:72px;font-weight:600;line-height:1;letter-spacing:-0.03em;margin:2px 0 22px}
+.notif{padding:12px 14px;display:flex;gap:10px}
+.notif .t{font-size:14px;font-weight:600;margin-top:2px}
+.notif .b{font-size:13px;color:rgba(255,255,255,.82)}
+.acts{margin-top:8px;overflow:hidden}
+.act{display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:0;border-top:1px solid rgba(255,255,255,.1);color:#fff;padding:12px 14px;font-size:14.5px;text-align:left}
+.act:first-child{border-top:0}
+.act:hover{background:rgba(255,255,255,.06)}
+.act svg{width:18px;height:18px;flex-shrink:0}
+.cap{font-size:11px;letter-spacing:.14em;color:#F06C9B;font-weight:600}
+.pbtn{border:0;border-radius:14px;padding:12px;font-size:14.5px;width:100%;color:#fff;background:#E0457B}
+.gbtn{border-radius:14px;padding:12px;font-size:14.5px;width:100%;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14)}
+.tbtn{border:0;background:transparent;color:rgba(255,255,255,.62);padding:10px;font-size:14.5px;width:100%}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
+.chip{border-radius:999px;padding:8px 12px;font-size:13px;color:#fff;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18)}
+.chip[aria-pressed="true"]{background:rgba(224,69,123,.25);border-color:#E0457B}
+.bub{max-width:86%;padding:10px 13px;border-radius:16px;font-size:13.5px;margin-bottom:10px}
+.bub.me{align-self:flex-end;background:#E0457B;border-bottom-right-radius:5px}
+.bub.ai{align-self:flex-start;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);border-bottom-left-radius:5px}
+.err{color:#FF9DB8;font-size:12px;min-height:16px}
+.apphead{display:flex;justify-content:space-between;align-items:center;margin:4px 0 12px}
+.apphead h4{margin:0;font-size:20px;font-weight:700}
+.task{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid rgba(255,255,255,.08);font-size:14px}
+.task:first-of-type{border-top:0}
+.cb{width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);display:inline-block;margin-right:10px;vertical-align:-4px}
+.cb.ok{border-color:#5FCB86;background:#5FCB86}
+.strike{text-decoration:line-through;color:rgba(255,255,255,.5)}
+.inbar{margin-top:auto;display:flex;gap:8px;align-items:center;padding:8px 8px 8px 14px}
+.inbar .tx{flex:1;font-size:13px}
+.send{width:36px;height:36px;border-radius:50%;border:0;background:#E0457B;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.send svg{width:18px;height:18px}
+.est{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0}
+.est .v{font-size:22px;font-weight:700}
+.step{width:32px;height:32px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;font-size:18px;line-height:1}
+.web{background:#F5F4F8;color:#222;border-radius:18px;padding:14px;flex:1;display:flex;flex-direction:column;gap:9px;font-size:13px}
+.web .url{font-size:11px;color:#777;text-align:center;background:#E8E6EE;border-radius:8px;padding:5px}
+.web .fld{background:#fff;border:1px solid #DDD;border-radius:8px;padding:8px 10px}
+.web .fld.empty{color:#999;border-style:dashed}
+.web .prog{height:5px;background:#E2E0E8;border-radius:3px}
+.web .prog i{display:block;height:5px;width:50%;background:#3E7FD9;border-radius:3px}
+.banner{position:absolute;left:12px;right:12px;top:52px;z-index:6;animation:drop .45s ease}
+@keyframes drop{from{transform:translateY(-16px);opacity:0}to{transform:none;opacity:1}}
+.la{padding:14px}
+.la .row{display:flex;align-items:center;gap:10px}
+.la .done{border:1px solid rgba(95,203,134,.55);background:rgba(95,203,134,.18);color:#9BE3B4;border-radius:10px;padding:7px 10px;font-size:12.5px}
+.la .pb{height:4px;background:rgba(255,255,255,.14);border-radius:2px;margin:12px 0 6px}
+.la .pb i{display:block;height:4px;background:#5B9BEF;border-radius:2px}
+.toast{margin-top:auto;padding:12px 14px;font-size:13px;display:flex;gap:10px;align-items:center}
+.center{flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center;gap:8px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Bildirimi kapatmak, işi bitirmek değil</h1>
+      <p class="lead">D-Plan için önerilen tamamlanma kontrolü özelliğinin hikaye tabanlı prototipi. Zeynep'in staj başvurusunu adım adım izle; telefondaki ya da yandaki düğmelerle farklı yolları dene.</p>
+    </div>
+    <button class="restart" id="restart" type="button">Baştan başla</button>
+  </header>
+
+  <section class="week" aria-label="Hikayenin zaman çizelgesi">
+    <div class="week-head"><strong>Son başvuru tarihine kalan süre</strong><span id="weekInfo"></span></div>
+    <div class="track" id="track">
+      <div class="days" id="days"></div>
+      <div class="rail"></div>
+      <div class="fill" id="fill"></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--pink)"></i>Hikayedeki an</span>
+      <span><i style="border:2px solid var(--blue);width:10px;height:10px"></i>En geç başlama zamanı</span>
+      <span><i style="background:var(--muted)"></i>Gönderilen hatırlatmalar</span>
+      <span><i style="background:var(--ink);border-radius:1px;width:3px"></i>Son tarih</span>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div>
+      <section class="story" aria-live="polite" id="story"></section>
+      <section class="log" aria-label="Arka planda olanlar">
+        <h3>Arka planda ne oluyor?</h3>
+        <p class="sub">Görev durumları ve kararlar, vaka belgesindeki sözde-kodla aynı isimlerle.</p>
+        <div class="state" id="state"></div>
+        <ol id="log"></ol>
+      </section>
+      <p class="note">Bu prototipte yapay zeka yanıtları senaryoya göre simüle edilmiştir; süre tahmini seçilen gereksinimlere göre değişir. Hatırlatma zamanları ise belgede anlatılan sabit kurallarla gerçekten hesaplanır. Erteleme sınırı varsayılan değer olan 3'tür.</p>
+    </div>
+    <div class="phone-col">
+      <div class="phone" aria-label="Telefon ekranı">
+        <div class="screen" id="screen"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var LIMIT = 3;
+  var ICON = {
+    cal:'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>',
+    check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>',
+    play:'<svg viewBox="0 0 24 24" fill="none" stroke="#F06C9B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5l12 7-12 7z"/></svg>',
+    clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>',
+    send:'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+    msg:'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18l-1 3 4-2h9a3 3 0 003-3V7a3 3 0 00-3-3H7a3 3 0 00-3 3v9"/></svg>'
+  };
+
+  var st;
+  function D(m,d,h,mi){ return new Date(2026, m, d, h, mi||0); }
+  function reset(){
+    st = {
+      scene:'intro', now:D(9,8,20,30), deadline:D(9,15,23,59),
+      chips:{form:false,cv:false,yazi:false}, est:0, startBy:null,
+      durum:'—', erteleme:0, next:null, startedAt:null, events:[], log:[], err:'', adjusted:false
+    };
+    addLog('Hikaye başladı. Zeynep staj ilanını görüyor.');
+    render();
+  }
+
+  function fmtT(d){ return d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}); }
+  function fmtD(d){ return d.toLocaleDateString('tr-TR',{day:'numeric',month:'long',weekday:'long'}); }
+  function fmtShort(d){ return d.toLocaleDateString('tr-TR',{day:'numeric',month:'short'}) + ' ' + fmtT(d); }
+  function fmtDur(m){ var h=Math.floor(m/60), r=m%60; if(!h) return m+' dk'; return h+' sa'+(r?' '+r+' dk':''); }
+  function addMin(d,m){ return new Date(d.getTime()+m*60000); }
+  function addLog(t){ st && st.log.unshift({at:st.now, t:t, fresh:true}); }
+
+  function estimate(){
+    var m = 20;
+    if(st.chips.cv) m += 30;
+    if(st.chips.yazi) m += 40;
+    return m;
+  }
+  function needsText(){
+    var parts=[];
+    if(st.chips.cv) parts.push('güncel CV\'ni');
+    if(st.chips.yazi) parts.push('ön yazını');
+    return parts.length ? parts.join(' ve ') + ' eklemeyi unutma.' : 'Gönder düğmesine bastığından emin ol.';
+  }
+  function nextTime(){
+    var pay = st.deadline - st.now - st.est*60000;
+    var n;
+    if(pay > 2*864e5){ n = addMin(st.now, 24*60); }
+    else if(pay > 6*36e5){ n = addMin(st.now, 180); }
+    else { n = addMin(st.now, 60); }
+    var h = n.getHours();
+    if(h >= 22){ n = new Date(n.getFullYear(), n.getMonth(), n.getDate()+1, 9, 0); }
+    else if(h < 9){ n = new Date(n.getFullYear(), n.getMonth(), n.getDate(), 9, 0); }
+    return n;
+  }
+  function ruleText(){
+    var pay = st.deadline - st.now - st.est*60000;
+    if(pay > 2*864e5) return 'Son tarihe 2 günden fazla var → yarın aynı saatte.';
+    if(pay > 6*36e5) return 'Son tarihe 2 günden az kaldı → 3 saat sonra.';
+    return 'Son tarih çok yakın → 1 saat sonra.';
+  }
+
+  function postpone(reason){
+    st.durum = 'ERTELENDİ';
+    st.erteleme += 1;
+    addLog(reason + ' → durum = ERTELENDİ, ertelemeSayısı = ' + st.erteleme);
+    if(st.erteleme >= LIMIT){
+      addLog('ertelemeSayısı ≥ sınır (' + LIMIT + ') → uygulama içinde soruluyor');
+      st.scene = 'limit';
+    } else {
+      st.next = nextTime();
+      if(st.next.getTime() + st.est*60000 > st.deadline.getTime()){
+        st.scene = 'missed';
+        addLog('Kalan süre işe yetmiyor → son tarih kaçırıldı');
+      } else {
+        addLog('sonrakiZaman(): ' + ruleText().replace(' →',',') + ' Plan: ' + fmtShort(st.next) + '. AI\'a yeni istek yok.');
+        st.scene = 'scheduled';
+      }
+    }
+    go();
+  }
+
+  var A = {
+    send:function(){
+      st.now = addMin(st.now, 1);
+      addLog('AI.tahminEt(başlık, sonTarih) → sonTarih = 15 Ekim 23:59, eminMi = hayır');
+      addLog('Kullanıcıya tek soru: gereksinimler (seçenekler görev türüne göre üretildi)');
+      st.scene='ask'; go();
+    },
+    chip:function(k){
+      if(k==='form'){ var v=!st.chips.form; st.chips={form:v,cv:false,yazi:false}; }
+      else { st.chips.form=false; st.chips[k]=!st.chips[k]; }
+      st.err=''; render();
+    },
+    confirmChips:function(){
+      if(!st.chips.form && !st.chips.cv && !st.chips.yazi){ st.err='Devam etmek için en az bir seçenek işaretle.'; render(); return; }
+      st.est = estimate();
+      st.startBy = D(9,13,10,0);
+      var g = st.chips.form ? 'sadece form' : ['form', st.chips.cv?'CV güncellemesi':null, st.chips.yazi?'ön yazı':null].filter(Boolean).join(' + ');
+      addLog('AI.tahminEt(..., gereksinimler: ' + g + ') → tahminiDk = ' + st.est + ', enGeçBaşlama = 13 Ekim 10:00');
+      st.scene='estimate'; go();
+    },
+    adj:function(d){ st.est = Math.max(10, Math.min(240, st.est + d)); st.adjusted=true; render(); },
+    save:function(){
+      if(st.adjusted) addLog('Kullanıcı tahmini düzeltti → tahminiDk = ' + st.est);
+      st.durum='BEKLİYOR';
+      addLog('Görev kaydedildi → durum = BEKLİYOR, hatırlatma 13 Ekim 10:00\'a planlandı');
+      st.scene='waiting'; go();
+    },
+    advanceToStart:function(){
+      st.now = new Date(st.startBy.getTime());
+      st.events.push(new Date(st.now.getTime()));
+      addLog('Hatırlatma gönderildi (Yaptım / Şimdi başlıyorum / Sonra)');
+      st.scene='notif'; go();
+    },
+    done:function(){
+      st.durum='TAMAMLANDI';
+      addLog('YAPTIM → bitir(): durum = TAMAMLANDI, bekleyen bildirimler iptal');
+      st.scene='claimed'; go();
+    },
+    start:function(){
+      st.now = addMin(st.now, 2);
+      st.startedAt = new Date(st.now.getTime());
+      st.durum='DEVAM_EDİYOR';
+      addLog('BAŞLIYORUM → durum = DEVAM_EDİYOR, kilit ekranı göstergesi açıldı');
+      addLog('kontrolPlanla(şimdi + ' + st.est + ' dk) → ' + fmtT(addMin(st.now, st.est)));
+      st.scene='form'; go();
+    },
+    later:function(){ postpone('SONRA'); },
+    ignore:function(){ st.now = addMin(st.now, 60); postpone('1 saat yanıt yok (TEPKİ_YOK)'); },
+    interrupt:function(){
+      st.now = addMin(st.startedAt, 18);
+      addLog('Kullanıcı uygulamadan çıktı; görev hâlâ DEVAM_EDİYOR, gösterge kilit ekranında');
+      st.scene='locked'; go();
+    },
+    advanceToCheck:function(){
+      st.now = addMin(st.startedAt, st.est);
+      st.events.push(new Date(st.now.getTime()));
+      addLog('Tahmini süre doldu → "Tamamladın mı?" kontrolü gönderildi');
+      st.scene='checkin'; go();
+    },
+    finished:function(){
+      st.durum='TAMAMLANDI';
+      addLog('TAMAMLADIM → bitir(): durum = TAMAMLANDI, gösterge kapandı');
+      st.scene='success'; go();
+    },
+    half:function(){ addLog('YARIDA_KALDI → gösterge kapandı'); postpone('ertele()'); },
+    advanceNext:function(){
+      st.now = new Date(st.next.getTime());
+      st.events.push(new Date(st.now.getTime()));
+      addLog('Hatırlatma gönderildi (erteleme ' + st.erteleme + '/' + LIMIT + ')');
+      st.scene='notif'; go();
+    },
+    keep:function(){
+      st.erteleme = 0;
+      st.next = nextTime();
+      addLog('"Evet, hatırlat" → ertelemeSayısı = 0, plan: ' + fmtShort(st.next));
+      st.scene='scheduled'; go();
+    },
+    redate:function(){
+      st.deadline = D(9,20,23,59);
+      st.erteleme = 0;
+      st.next = nextTime();
+      addLog('"Tarihi değiştir" → sonTarih = 20 Ekim 23:59, ertelemeSayısı = 0, plan: ' + fmtShort(st.next));
+      st.scene='scheduled'; go();
+    },
+    drop:function(){
+      st.durum='ARŞİV';
+      addLog('"Vazgeçtim" → durum = ARŞİV, hatırlatma yok');
+      st.scene='archived'; go();
+    },
+    early:function(){
+      st.now = D(9,10,15,40);
+      st.durum='TAMAMLANDI';
+      addLog('Kullanıcı görevi uygulamada kendisi tamamladı → durum = TAMAMLANDI');
+      addLog('enGeçBaşlama\'dan önce bitti → 13 Ekim 10:00 hatırlatması iptal edildi');
+      st.scene='early'; go();
+    },
+    restart:function(){ reset(); }
+  };
+  function go(){ render(); }
+
+  /* ---------- Phone ---------- */
+  function statusBar(){
+    var live = (st.durum==='DEVAM_EDİYOR' && st.startedAt);
+    var island = live
+      ? '<div class="island live" aria-label="Dynamic Island: başvuru devam ediyor"><span class="dot"></span><span>Başvuru</span><span>' + Math.round((st.now-st.startedAt)/60000) + ' dk</span></div>'
+      : '<div class="island"></div>';
+    return island + '<div class="sb"><span>' + fmtT(st.now) + '</span><span class="ic" aria-hidden="true"><span class="bar" style="height:5px"></span><span class="bar" style="height:7px"></span><span class="bar" style="height:9px"></span><span class="bar" style="height:11px"></span><span style="margin-left:6px;border:1.5px solid #fff;border-radius:4px;width:24px;height:12px;display:inline-block;position:relative"><span style="position:absolute;inset:1.5px;width:70%;background:#fff;border-radius:2px"></span></span></span></div>';
+  }
+  function lockHead(){ return '<div class="lock-date">' + fmtD(st.now) + '</div><div class="lock-time">' + fmtT(st.now) + '</div>'; }
+  function notifCard(title, body){
+    return '<div class="glass notif"><div class="appic">' + ICON.cal + '</div><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between"><span class="mu">D-Plan</span><span class="mu">şimdi</span></div><div class="t">' + title + '</div><div class="b">' + body + '</div></div></div>';
+  }
+  function act(fn,icon,label){ return '<button class="act" type="button" data-a="' + fn + '">' + icon + '<span>' + label + '</span></button>'; }
+  function liveCard(){
+    var el = Math.round((st.now-st.startedAt)/60000);
+    var pct = Math.min(100, Math.round(el/st.est*100));
+    return '<div class="glass la"><div class="row"><div class="appic">' + ICON.cal + '</div><div style="flex:1"><div class="cap">DEVAM EDİYOR</div><div style="font-size:14.5px;font-weight:600">Staj başvurusu</div></div><button class="done" type="button" data-a="finished">Tamamladım</button></div><div class="pb"><i style="width:' + pct + '%"></i></div><div class="mu">' + el + ' dk önce başladın · tahmini ' + fmtDur(st.est) + '</div></div>';
+  }
+  function appToday(extra, done){
+    var t = done
+      ? '<div class="task"><span><span class="cb ok"></span><span class="strike">Staj başvurusu</span></span><span class="mu">tamamlandı</span></div>'
+      : '';
+    return '<div class="apphead"><h4>İyi akşamlar, Zeynep</h4></div>' +
+      '<div class="glass" style="padding:12px 14px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><strong style="font-size:14px">Bugünün görevleri</strong><span class="mu">' + st.now.toLocaleDateString('tr-TR',{day:'numeric',month:'short'}) + '</span></div>' +
+      t +
+      '<div class="task"><span><span class="cb ok"></span><span class="strike">Mailleri incele</span></span><span class="mu">08:00</span></div>' +
+      '<div class="task"><span><span class="cb ok"></span><span class="strike">Faturaları öde</span></span><span class="mu">10:00</span></div>' +
+      '<div class="task"><span><span class="cb"></span>Spor yap</span><span class="mu">21:00</span></div></div>' + (extra||'');
+  }
+
+  function phone(){
+    var s = st.scene, h = '';
+    switch(s){
+      case 'intro':
+        h = appToday('<div class="glass inbar"><span class="tx">15 Ekim\'e kadar Kuzey Teknoloji staj başvurusunu yap</span><button class="send" type="button" data-a="send" aria-label="Asistana gönder">' + ICON.send + '</button></div>');
+        break;
+      case 'ask':
+        h = '<div class="apphead"><h4>Asistan</h4></div><div style="display:flex;flex-direction:column">' +
+          '<div class="bub me">15 Ekim\'e kadar Kuzey Teknoloji staj başvurusunu yap</div>' +
+          '<div class="bub ai">Son tarihi 15 Ekim olarak kaydettim. Ne kadar süreceğini doğru tahmin edebilmem için: bu başvuru neler istiyor?</div></div>' +
+          '<div class="chips" role="group" aria-label="Gereksinimler">' +
+          chip('form','Sadece form') + chip('cv','CV güncellemesi') + chip('yazi','Ön yazı') + '</div>' +
+          '<div class="err" role="alert">' + st.err + '</div>' +
+          '<button class="pbtn" type="button" data-a="confirmChips" style="margin-top:auto">Devam</button>';
+        break;
+      case 'estimate':
+        h = '<div class="apphead"><h4>Asistan</h4></div>' +
+          '<div class="glass" style="padding:16px"><div class="cap" style="margin-bottom:8px">YENİ GÖREV</div>' +
+          '<div style="font-size:17px;font-weight:600">Staj başvurusu</div><div class="mu" style="margin-bottom:10px">Son tarih 15 Ekim 23:59</div>' +
+          '<div class="mu">Tahmini süre (dokunarak düzeltebilirsin)</div>' +
+          '<div class="est"><button class="step" type="button" data-a="adj" data-v="-10" aria-label="10 dakika azalt">−</button><span class="v">~' + fmtDur(st.est) + '</span><button class="step" type="button" data-a="adj" data-v="10" aria-label="10 dakika artır">+</button></div>' +
+          '<div class="mu" style="margin-top:6px">En geç başlaman gereken an</div><div style="font-size:15px;font-weight:600">13 Ekim Salı, 10:00</div>' +
+          '<div class="mu" style="margin-top:6px">Daha erken de başlayabilirsin. Bu, bir sorun çıkarsa telafi payı bırakan son güvenli an.</div></div>' +
+          '<button class="pbtn" type="button" data-a="save" style="margin-top:auto">Görevi kaydet</button>';
+        break;
+      case 'waiting':
+        h = appToday('<div class="glass toast"><span style="color:#9BE3B4">' + ICON.check.replace('currentColor','#9BE3B4').replace('<svg','<svg width="18" height="18"') + '</span><span>Staj başvurusu kaydedildi. 13 Ekim 10:00\'da hatırlatacağım.</span></div>');
+        break;
+      case 'notif':
+        var first = st.events.length <= 1;
+        h = lockHead() + notifCard(first ? 'Staj başvurusuna başlama zamanı' : 'Staj başvurusu hâlâ bekliyor',
+            first ? 'En geç bugün başlaman iyi olur · yaklaşık ' + fmtDur(st.est) + ' sürer' : 'Son tarihe ' + remaining() + ' kaldı · yaklaşık ' + fmtDur(st.est)) +
+          '<div class="glass acts">' + act('done', ICON.check, 'Yaptım') + act('start', ICON.play, 'Şimdi başlıyorum') + act('later', ICON.clock, 'Sonra') + '</div>';
+        break;
+      case 'form':
+        h = '<div class="web"><div class="url">kariyer.kuzeyteknoloji.com/staj-2027</div>' +
+          '<div style="font-weight:600;font-size:15px">Yaz stajı başvurusu</div><div class="prog" aria-label="Form ilerlemesi yüzde elli"><i></i></div><div style="font-size:11px;color:#777">Adım 2 / 4</div>' +
+          '<div class="fld">Zeynep Yılmaz</div><div class="fld">zeynep@ornek.com</div><div class="fld">Bilgisayar Mühendisliği, 3. sınıf</div>' +
+          (st.chips.cv ? '<div class="fld empty">CV yükle (PDF)</div>' : '') +
+          (st.chips.yazi ? '<div class="fld empty">Ön yazı</div>' : '') +
+          '<div class="fld empty">Neden bu staj?</div></div>' +
+          '<div class="glass notif banner"><div class="appic" style="background:#34C759">' + ICON.msg + '</div><div style="flex:1"><div style="display:flex;justify-content:space-between"><span class="mu">Mesajlar</span><span class="mu">şimdi</span></div><div class="t">Ayşe</div><div class="b">Kahveye çıkıyor muyuz? 5 dk\'ya kapıdayım</div></div></div>';
+        break;
+      case 'locked':
+        h = lockHead() + liveCard();
+        break;
+      case 'checkin':
+        h = lockHead() + liveCard() + '<div style="height:10px"></div>' +
+          notifCard('Başvuruyu gönderdin mi?', 'Başlayalı ' + fmtDur(st.est) + ' oldu. ' + needsText()) +
+          '<div class="glass acts">' + act('finished', ICON.check, 'Tamamladım') + act('half', ICON.clock, 'Yarıda kaldı') + '</div>';
+        break;
+      case 'scheduled':
+        h = lockHead() + '<div class="glass toast" style="margin-top:0"><span>' + ICON.clock.replace('<svg','<svg width="18" height="18"') + '</span><span>Tamam. ' + fmtShort(st.next) + '\'da tekrar hatırlatacağım.</span></div>';
+        break;
+      case 'limit':
+        h = '<div class="center" style="justify-content:flex-start;text-align:left;padding-top:20px">' +
+          '<div class="cap">' + LIMIT + ' KEZ ERTELENDİ</div>' +
+          '<div style="font-size:21px;font-weight:700;line-height:1.25">Bu görevi hâlâ yapmak istiyor musun?</div>' +
+          '<div class="mu" style="font-size:13px;margin-bottom:12px">Staj başvurusu · son tarihe ' + remaining() + ' kaldı</div>' +
+          '<button class="pbtn" type="button" data-a="keep">Evet, hatırlat</button>' +
+          '<button class="gbtn" type="button" data-a="redate">Tarihi değiştir</button>' +
+          '<button class="tbtn" type="button" data-a="drop">Vazgeçtim</button></div>';
+        break;
+      case 'success':
+        h = appToday('', true);
+        break;
+      case 'early':
+        h = appToday('', true);
+        break;
+      case 'claimed':
+        h = appToday('', true);
+        break;
+      case 'archived':
+        h = appToday('<div class="glass toast"><span>Staj başvurusu arşivlendi. İstersen arşivden geri alabilirsin.</span></div>');
+        break;
+      case 'missed':
+        h = lockHead() + '<div class="glass toast" style="margin-top:0"><span>Staj başvurusunun son tarihi geçti.</span></div>';
+        break;
+    }
+    document.getElementById('screen').innerHTML = statusBar() + '<div class="scr">' + h + '</div>';
+  }
+  function chip(k,l){ return '<button class="chip" type="button" data-a="chip" data-v="' + k + '" aria-pressed="' + (st.chips[k]?'true':'false') + '">' + l + '</button>'; }
+  function remaining(){
+    var ms = st.deadline - st.now; if(ms<0) return '0 saat';
+    var d = Math.floor(ms/864e5), h = Math.floor((ms%864e5)/36e5);
+    return d ? (d + ' gün' + (h? ' ' + h + ' saat':'')) : (h + ' saat');
+  }
+
+  /* ---------- Story ---------- */
+  function story(){
+    var s = st.scene, c, t, p, why, a = [];
+    switch(s){
+      case 'intro':
+        c='Bölüm 1 · 8 Ekim, akşam'; t='Bir ilan, bir son tarih';
+        p='Zeynep çok istediği bir şirketin staj ilanını görüyor. Son başvuru günü 15 Ekim. Unutmamak için hemen D-Plan\'ın asistanına yazıyor.';
+        why='Görev doğal bir cümleyle ekleniyor. Özellik yalnızca son tarihi olan görevlerde devreye giriyor.';
+        a=[['send','Mesajı gönder',1]]; break;
+      case 'ask':
+        c='Bölüm 1 · 8 Ekim, akşam'; t='AI emin değil, o yüzden soruyor';
+        p='"Staj başvurusu" on dakikalık bir form da olabilir, CV ve ön yazı isteyen saatlik bir iş de. Asistan tahmin uydurmak yerine tek bir kısa soru soruyor.';
+        why='Seçenekler görev türüne göre üretiliyor. Fatura ödemek gibi net bir görevde bu soru hiç sorulmaz.';
+        a=[['confirmChips','Seçimle devam et',1]]; break;
+      case 'estimate':
+        c='Bölüm 1 · 8 Ekim, akşam'; t='Tahmin görünür ve düzeltilebilir';
+        p='Seçtiğin gereksinimlere göre asistan işin yaklaşık ' + fmtDur(st.est) + ' süreceğini ve telafi payı bırakmak için en geç 13 Ekim\'de başlaması gerektiğini hesaplıyor. Bu bir başlama saati değil, bir güvenlik ağı: Zeynep daha önce bitirirse hatırlatma hiç gelmez. Tahmine katılmıyorsan + ve − ile değiştirebilirsin.';
+        why='Yapay zeka yalnızca burada, görev oluşturulurken bir kez çalışıyor. Bundan sonraki her şey sabit kurallarla ilerliyor.';
+        a=[['save','Görevi kaydet',1]]; break;
+      case 'waiting':
+        c='Aradan birkaç gün geçiyor'; t='Zeynep başvuruyu aklından çıkarıyor';
+        p='Okul, ödevler, sınavlar. Normal şartlarda staj başvurusu tam da burada unutulup gidiyor.';
+        why='Zaman çizelgesindeki mavi halka en geç başlama zamanı. Zeynep o güne kadar başvurusunu kendiliğinden tamamlarsa planlı hatırlatma iptal olur ve D-Plan araya hiç girmez.';
+        a=[['advanceToStart','13 Ekim 10:00\'a ilerle',1],['early','Zeynep erkenden başvursun',0]]; break;
+      case 'notif':
+        if(st.events.length<=1){
+          c='Bölüm 2 · ' + fmtShort(st.now); t='Hatırlatma geliyor';
+          p='Bildirimde üç seçenek var. Zeynep\'in hikayesinde kritik an bu: "Şimdi başlıyorum" diyerek forma geçiyor. İstersen diğer yolları da deneyebilirsin.';
+          why='Kural basit: kullanıcı açıkça "yaptım" demedikçe görev açık kalır. Bildirimi kaydırmak ya da hiç dokunmamak "Sonra" sayılır.';
+        } else {
+          c='Hatırlatma ' + st.events.length + ' · ' + fmtShort(st.now); t='Görev hâlâ açık';
+          p='D-Plan görevi unutmadı. Son tarihe ' + remaining() + ' kaldı ve bildirim bunu açıkça söylüyor.';
+          why='Bu hatırlatmanın zamanını AI değil, AI\'ın süre tahminine dayanan kural belirledi. Erteleme ' + st.erteleme + '/' + LIMIT + '.';
+        }
+        a=[['start','Şimdi başlıyorum',1],['later','Sonra',0],['done','Yaptım',0],['ignore','Bildirime hiç dokunma',0]]; break;
+      case 'form':
+        c='Bölüm 3 · ' + fmtShort(st.now); t='Formun yarısında bir mesaj';
+        p='Zeynep bilgilerini girmeye başladı. Tam formun yarısındayken arkadaşından bir mesaj geliyor. Telefonu kilitleyip çıkıyor ve başvurunun bittiğini sanıyor.';
+        why='Bu, Zeynep\'in gerçekte yaşadığı an. Eskiden burada hiçbir şey olmazdı.';
+        a=[['interrupt','Mesaja geç, telefonu kilitle',1]]; break;
+      case 'locked':
+        c='Bölüm 3 · ' + fmtShort(st.now); t='Yarım iş gözden kaybolmuyor';
+        p='Kilit ekranında ve ekranın üstündeki Dynamic Island\'da sessiz bir gösterge duruyor: başvuru hâlâ devam ediyor. Ses yok, titreşim yok; sadece görünür.';
+        why='Bu gösterge iOS Live Activities ile yapılır ve yalnızca "devam eden" görevlerde kullanılır; günlerce ekranda kalmaz.';
+        a=[['advanceToCheck','Tahmini süre dolsun',1],['finished','Göstergedeki "Tamamladım"a bas',0]]; break;
+      case 'checkin':
+        c='Bölüm 4 · ' + fmtShort(st.now); t='"Gönderdin mi?"';
+        p='Tahmini süre doldu. D-Plan, işin bittiğini varsaymak yerine soruyor. Bildirim metni göreve özel: ' + (st.chips.cv||st.chips.yazi ? 'seçtiğin gereksinimleri hatırlatıyor.' : 'gönder düğmesine basılmasını hatırlatıyor.');
+        why='Zeynep gerçekte bunu ancak sonuçlar açıklandığında fark etmişti. Burada aynı gün fark ediyor.';
+        a=[['half','Yarıda kaldı',1],['finished','Tamamladım',0]]; break;
+      case 'scheduled':
+        c='Erteleme ' + st.erteleme + '/' + LIMIT; t='Bir sonraki hatırlatma planlandı';
+        p=ruleText() + ' Sonraki hatırlatma ' + fmtShort(st.next) + '. Gece saatlerine denk gelseydi sabah 09:00\'a kayardı.';
+        why='Her ertelemede AI\'a yeniden sorulmuyor; davranış öngörülebilir ve test edilebilir kalıyor.';
+        a=[['advanceNext','Sonraki hatırlatmaya ilerle',1]]; break;
+      case 'limit':
+        c='Erteleme sınırı'; t='Israr etmek yerine sormak';
+        p='Görev ' + LIMIT + ' kez ertelendi. D-Plan dırdır etmek yerine kontrolü Zeynep\'e veriyor: hâlâ istiyor mu, tarih mi değişmeli, yoksa vazgeçti mi?';
+        why='Sınır varsayılan olarak 3; ayarlardan kişiye göre değiştirilebilir.';
+        a=[['keep','Evet, hatırlat',1],['redate','Tarihi değiştir',0],['drop','Vazgeçtim',0]]; break;
+      case 'success':
+        c='Son · ' + fmtShort(st.now); t='Başvuru gerçekten gönderildi';
+        p='Zeynep başvurusunu ' + st.now.toLocaleDateString('tr-TR',{day:'numeric',month:'long'}) + '\'da, son tarihten ' + remaining() + ' önce tamamladı. Yarıda kalan iş, kimse fark etmeden kaybolmadı.';
+        why='Gerçek hayatta bu başvuru hiç tamamlanmamıştı. Farkı yaratan tek şey: bildirimi kapatmanın ya da işe başlamanın "bitti" sayılmaması.';
+        a=[['restart','Baştan başla',1]]; break;
+      case 'early':
+        c='Farklı bir yol · ' + fmtShort(st.now); t='Erken bitirmek en iyisi';
+        p='Zeynep 10 Ekim\'de boş bir anında başvurusunu tamamladı ve görevi D-Plan\'da işaretledi. 13 Ekim için planlanan hatırlatma iptal oldu; uygulama ona hiç bildirim göndermedi.';
+        why='En geç başlama zamanı bir hedef değil, bir güvenlik ağı. Görevini zamanında yapan kullanıcı özelliği fark etmez bile.';
+        a=[['restart','Ana hikayeyi dene',1]]; break;
+      case 'claimed':
+        c='Farklı bir yol'; t='"Yaptım" bir beyan';
+        p='Kullanıcı "Yaptım" dediğinde D-Plan ona güvenir ve bir daha sormaz. Tamamlanmayı otomatik doğrulamak (örneğin onay mailini okumak) gizlilik ve kapsam nedeniyle bilinçli olarak dışarıda bırakıldı.';
+        why='Asıl koruma "Şimdi başlıyorum" yolunda: işe başlamak, bitirmek sayılmıyor. O yolu denemek için baştan başla.';
+        a=[['restart','Baştan başla',1]]; break;
+      case 'archived':
+        c='Farklı bir yol'; t='Vazgeçmek de bir karar';
+        p='Görev arşive taşındı ve hatırlatmalar durdu. Kullanıcıyı suçlamadan, sessizce.';
+        why='Kontrol her zaman kullanıcıda kalır.';
+        a=[['restart','Baştan başla',1]]; break;
+      case 'missed':
+        c='Farklı bir yol'; t='Süre yetmedi';
+        p='Kalan süre, işin tahmini süresinden kısa kaldı. Son tarihi değiştirmek mümkündü ama seçilmedi.';
+        why='Bu yüzden ilk hatırlatma son güne değil, tahmini süreye göre hesaplanan en geç başlama zamanına konuyor.';
+        a=[['restart','Baştan başla',1]]; break;
+    }
+    var html = '<p class="chapter">' + c + '</p><h2>' + t + '</h2><p>' + p + '</p><p class="why">' + why + '</p><div class="actions">' +
+      a.map(function(x){ return '<button type="button" class="btn' + (x[2]?' primary':'') + '" data-a="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+      (['intro','ask','estimate','notif','checkin','limit'].indexOf(s)>-1 ? '<p class="hint">Aynı seçimleri telefonun içinden de yapabilirsin.</p>' : '');
+    document.getElementById('story').innerHTML = html;
+  }
+
+  /* ---------- Timeline ---------- */
+  function timeline(){
+    var start = D(9,8,0,0);
+    var endDay = new Date(st.deadline.getFullYear(), st.deadline.getMonth(), st.deadline.getDate()+1);
+    var span = endDay - start;
+    var nDays = Math.round(span/864e5);
+    var days = '';
+    for(var i=0;i<nDays;i++){
+      var d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
+      days += '<div class="day"><b>' + d.getDate() + '</b>' + d.toLocaleDateString('tr-TR',{weekday:'short'}) + '</div>';
+    }
+    function pos(d){ return Math.max(0, Math.min(100, (d-start)/span*100)); }
+    var track = document.getElementById('track');
+    track.querySelectorAll('.mk,.deadline').forEach(function(n){ n.remove(); });
+    document.getElementById('days').innerHTML = days;
+    var add = function(cls, left, label){ var e=document.createElement('div'); e.className=cls; e.style.left=left+'%'; if(label){e.setAttribute('title',label);} track.appendChild(e); };
+    add('deadline', pos(st.deadline), 'Son tarih');
+    if(st.startBy) add('mk start', pos(st.startBy), 'En geç başlama');
+    st.events.forEach(function(e){ add('mk ev', pos(e), 'Hatırlatma ' + fmtShort(e)); });
+    add('mk now', pos(st.now), 'Şu an');
+    document.getElementById('fill').style.width = pos(st.now) + '%';
+    document.getElementById('weekInfo').textContent = 'Hikayede şu an: ' + fmtShort(st.now) + ' · son tarihe ' + remaining();
+  }
+
+  function logView(){
+    document.getElementById('state').innerHTML =
+      '<span class="pill">durum: ' + st.durum + '</span>' +
+      '<span class="pill">ertelemeSayısı: ' + st.erteleme + '/' + LIMIT + '</span>' +
+      '<span class="pill">tahminiDk: ' + (st.est||'—') + '</span>';
+    document.getElementById('log').innerHTML = st.log.slice(0,10).map(function(l){
+      var r = '<li' + (l.fresh?' class="new"':'') + '><time>' + l.at.toLocaleDateString('tr-TR',{day:'numeric',month:'short'}) + ' ' + fmtT(l.at) + '</time><span>' + l.t + '</span></li>';
+      l.fresh = false; return r;
+    }).join('');
+  }
+
+  function render(){ phone(); story(); timeline(); logView(); }
+
+  document.addEventListener('click', function(e){
+    var b = e.target.closest('[data-a]'); if(!b) return;
+    var fn = A[b.getAttribute('data-a')]; if(!fn) return;
+    var v = b.getAttribute('data-v');
+    fn(v && !isNaN(+v) ? +v : v);
+  });
+  document.getElementById('restart').addEventListener('click', reset);
+  reset();
+})();
+</script>
+</body>
+</html>
